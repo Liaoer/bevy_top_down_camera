@@ -44,22 +44,31 @@ pub struct TopDownCamera {
     /// Whether camera should follow [`TopDownCameraTarget`] or not
     pub follow: bool,
     pub cursor_enabled: bool,
+    /// Value that will be used to lerp camera move speed
+    pub cursor_move_speed: f32,
     /// Only relevant if cursor_enabled
     ///
     /// Distance from the edges of the screen in pixels
     /// When cursor enters this edge - camera will start to move with the speed interpolated
     /// between zero and max_speed depending how far into edge you move cursor
     pub cursor_edge_margin: Vec2,
+    /// Speed of the rotate action
+    pub cursor_rotate_speed: f32,
     pub zoom_enabled: bool,
     /// Only relevant if zoom_enabled
     /// Zoom in/out the map
     pub zoom: Zoom,
     /// Height range of the camera
     pub height: Height,
+    pub height_keys_enabled: bool,
+    /// Key to lower the camera vertically
+    pub height_lower_key: InputType,
+    /// Key to rise the camera vertically
+    pub height_rise_key: InputType,
+    /// Key to rotate the camera horizontally
+    pub rotate_key: InputType,
     /// Max speed which will be used in egde interpolation
-    pub max_speed: f32,
-    /// Speed of the rotate action
-    pub rotate_speed: f32,
+    pub cursor_max_speed: f32,
     #[doc(hidden)]
     pub mode: CameraMode,
     #[doc(hidden)]
@@ -73,19 +82,49 @@ impl Default for TopDownCamera {
             zoom_enabled: true,
             zoom: (5.0, 50.0).into(),
             cursor_enabled: true,
+            cursor_move_speed: 0.2,
+            cursor_max_speed: 200.0,
+            cursor_rotate_speed: 0.01,
             cursor_edge_margin: Vec2::splat(30.0),
-            height: Height::new(5.0, 50.0),
-            rotate_speed: 0.01,
-            max_speed: 200.0,
             mode: CameraMode::Move,
             initial_setup: false,
+            height: Height::new(5.0, 50.0),
+            height_keys_enabled: true,
+            height_rise_key: KeyCode::KeyX.into(),
+            height_lower_key: KeyCode::KeyZ.into(),
+            rotate_key: MouseButton::Right.into(),
         }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum InputType {
+    Key(KeyCode),
+    Mouse(MouseButton),
+}
+impl InputType {
+    fn key(&self) -> KeyCode {
+        match self {
+            InputType::Key(key) => *key,
+            _ => unreachable!("not key"),
+        }
+    }
+}
+impl From<KeyCode> for InputType {
+    fn from(value: KeyCode) -> Self {
+        InputType::Key(value)
+    }
+}
+impl From<MouseButton> for InputType {
+    fn from(value: MouseButton) -> Self {
+        InputType::Mouse(value)
     }
 }
 
 pub struct Zoom {
     pub min: f32,
     pub max: f32,
+    /// Value that will be used to lerp camera zoom speed
     pub speed: f32,
 }
 
@@ -94,7 +133,7 @@ impl Zoom {
         Self {
             min,
             max,
-            speed: 10.0,
+            speed: 0.3,
         }
     }
     pub fn with_speed(mut self, speed: f32) -> Self {
@@ -108,7 +147,7 @@ impl From<(f32, f32)> for Zoom {
         Self {
             min,
             max,
-            speed: 10.0,
+            speed: 0.3,
         }
     }
 }
@@ -154,9 +193,9 @@ fn sync_player_camera(
     }
 
     for player in player_q.iter() {
-        let mut new = player.looking_at(Vec3::new(0.0, 0.0, -f32::INFINITY), Vec3::Y);
+        let mut new = player.looking_at(Vec3::new(0.0, 0.0, -10_000.0), Vec3::Y);
         new.rotate_x(-0.65);
-        let offset = cam.height.max / 2.0;
+        let offset = cam.height.max / 3.0;
 
         pos.rotation = new.rotation;
         pos.translation = new.translation + Vec3::new(0.0, offset, offset);
@@ -168,7 +207,7 @@ fn sync_player_camera(
 }
 
 #[doc(hidden)]
-#[derive(Component, Default)]
+#[derive(Component, Default, Clone, PartialEq)]
 pub enum CameraMode {
     #[default]
     Move,

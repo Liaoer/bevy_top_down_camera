@@ -1,9 +1,6 @@
 use super::*;
 use bevy::{
-    input::{
-        ButtonState,
-        mouse::{MouseButtonInput, MouseMotion, MouseWheel},
-    },
+    input::mouse::{MouseMotion, MouseWheel},
     window::PrimaryWindow,
 };
 
@@ -11,8 +8,10 @@ pub struct MousePlugin;
 
 impl Plugin for MousePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(PreUpdate, move_on_edges)
-            .add_systems(Update, (mode_switch, zoom.run_if(zoom_condition)));
+        app.add_systems(PreUpdate, move_on_edges).add_systems(
+            Update,
+            (mode_switch, change_height, zoom.run_if(zoom_condition)),
+        );
     }
 }
 
@@ -26,6 +25,11 @@ pub fn move_on_edges(
     let Ok((cam, mut pos)) = cam_q.single_mut() else {
         return;
     };
+
+    if !cam.cursor_enabled {
+        return;
+    }
+
     let Ok(window) = window_q.single() else {
         return;
     };
@@ -85,12 +89,14 @@ pub fn move_on_edges(
             // Apply movement with adjusted speed
             if movement != Vec3::ZERO {
                 let edge_rel_speed = edge_rel_speed.max(0.1);
-                let speed = cam.max_speed / edge_rel_speed;
-                pos.translation += movement.normalize_or_zero() * speed * time.delta_secs();
+                let speed = cam.cursor_max_speed / edge_rel_speed;
+                let delta = movement.normalize_or_zero() * speed * time.delta_secs();
+                let target = pos.translation + delta;
+                pos.translation = pos.translation.lerp(target, cam.cursor_move_speed);
             }
         }
         CameraMode::Rotate => {
-            let yaw_rot = Quat::from_rotation_y(-value.x * cam.rotate_speed);
+            let yaw_rot = Quat::from_rotation_y(-value.x * cam.cursor_rotate_speed);
             pos.rotate(yaw_rot);
         }
     }
@@ -109,25 +115,65 @@ fn zoom(
         scroll += ev.y;
     }
 
+    if scroll == 0.0 {
+        return;
+    }
+
     let direction = pos.forward().normalize();
-    pos.translation += direction * scroll * cam.zoom.speed;
-    // pos.translation.y = pos.translation.y.max(cam.height.max);
+    let delta = direction * scroll;
+    let target = pos.translation + delta;
+    if target.y < cam.height.min || target.y > cam.height.max {
+        return;
+    }
+    pos.translation = pos.translation.lerp(target, cam.zoom.speed);
 }
 
-fn mode_switch(mut events: EventReader<MouseButtonInput>, mut cam_q: Query<&mut TopDownCamera>) {
+fn change_height(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut cam_q: Query<(&TopDownCamera, &mut Transform)>,
+) {
+    let Ok((cam, mut pos)) = cam_q.single_mut() else {
+        return;
+    };
+
+    let mut delta = 0.0;
+
+    if keys.pressed(cam.height_rise_key.key()) {
+        delta += 1.0;
+    }
+    if keys.pressed(cam.height_lower_key.key()) {
+        delta -= 1.0;
+    }
+
+    let target = pos.translation.y + delta;
+    if target < cam.height.min || target > cam.height.max {
+        return;
+    }
+    pos.translation.y = pos.translation.y.lerp(target, cam.zoom.speed);
+}
+
+fn mode_switch(
+    mut cam_q: Query<&mut TopDownCamera>,
+    mouse: Res<ButtonInput<MouseButton>>,
+    keys: Res<ButtonInput<KeyCode>>,
+) {
     let Ok(mut cam) = cam_q.single_mut() else {
         return;
     };
 
-    for ev in events.read() {
-        if ev.button == MouseButton::Right {
-            match ev.state {
-                ButtonState::Pressed => {
-                    cam.mode = CameraMode::Rotate;
-                }
-                ButtonState::Released => {
-                    cam.mode = CameraMode::Move;
-                }
+    match cam.rotate_key {
+        InputType::Key(key) => {
+            if keys.pressed(key) {
+                cam.mode = CameraMode::Rotate;
+            } else {
+                cam.mode = CameraMode::Move;
+            }
+        }
+        InputType::Mouse(btn) => {
+            if mouse.pressed(btn) {
+                cam.mode = CameraMode::Rotate;
+            } else {
+                cam.mode = CameraMode::Move;
             }
         }
     }

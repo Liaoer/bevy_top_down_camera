@@ -36,7 +36,24 @@ fn spawn_player(
 fn spawn_camera(mut commands: Commands) {
     let camera = (
         Camera3d::default(),
-        TopDownCamera::default(), // ADD THIS
+        // these are default values, but you can change anything you'd want
+        TopDownCamera {
+            follow: false,
+            zoom_enabled: true,
+            zoom: (5.0, 50.0).into(),
+            cursor_enabled: true,
+            cursor_move_speed: 0.2,
+            cursor_max_speed: 200.0,
+            cursor_rotate_speed: 0.01,
+            cursor_edge_margin: Vec2::splat(30.0),
+            mode: CameraMode::Move,
+            initial_setup: false,
+            height: Height::new(5.0, 50.0),
+            height_keys_enabled: true,
+            height_rise_key: KeyCode::KeyX.into(),
+            height_lower_key: KeyCode::KeyZ.into(),
+            rotate_key: MouseButton::Right.into(),
+        }, // ADD THIS
     );
     commands.spawn(camera);
 }
