@@ -64,15 +64,21 @@ Most settings can be overridden:
 commands.spawn((
     // These are the default settings
     TopDownCamera {
-        follow: true,
+        follow: false,
         zoom_enabled: true,
-        zoom: Zoom::new(5.0, 50.0, 10.0),
+        zoom: (5.0, 50.0).into(),
         cursor_enabled: true,
+        cursor_move_speed: 0.2,
+        cursor_max_speed: 200.0,
+        cursor_rotate_speed: 0.01,
         cursor_edge_margin: Vec2::splat(30.0),
+        mode: CameraMode::Move,
+        initial_setup: false,
         height: Height::new(5.0, 50.0),
-        rotate_speed: 0.01,
-        max_speed: 200.0,
-        ..default()
+        height_keys_enabled: true,
+        height_rise_key: KeyCode::KeyX.into(),
+        height_lower_key: KeyCode::KeyZ.into(),
+        rotate_key: MouseButton::Right.into(),
     },
     Camera3d::default(),
 ));
@@ -100,8 +106,8 @@ When using third party physics engines such as bevy rapier 3d or avian 3d, you s
 ## Bevy Version Compatibility
 
 | bevy | bevy_top_down_camera |
-| ---- | ------------------------ |
-| 0.16 | 0.1.0 - 0.1.3              |
+| ---- | -------------------- |
+| 0.16 | 0.1.0 - 0.1.5        |
 
 ## License
 
