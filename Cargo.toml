@@ -12,7 +12,7 @@ readme = "README.md"
 exclude = ["assets/*"]
 
 [dependencies]
-bevy = { version = "0.16", default-features = false, features = ["bevy_window"] }
+bevy = { path = "../../bevy_engine", default-features = false, features = ["bevy_window"] }
 
 [dev-dependencies]
-bevy = "0.16"
+bevy = { path = "../../bevy_engine" }
